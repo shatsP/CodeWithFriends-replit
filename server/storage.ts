@@ -1,5 +1,7 @@
-import { type User, type InsertUser, type WaitlistEmail, type InsertWaitlistEmail } from "@shared/schema";
+import { type User, type InsertUser, type WaitlistEmail, type InsertWaitlistEmail, users, waitlistEmails } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, count } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -56,4 +58,47 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async addToWaitlist(insertWaitlistEmail: InsertWaitlistEmail): Promise<WaitlistEmail> {
+    const [waitlistEmail] = await db
+      .insert(waitlistEmails)
+      .values(insertWaitlistEmail)
+      .returning();
+    return waitlistEmail;
+  }
+
+  async getWaitlistEmail(email: string): Promise<WaitlistEmail | undefined> {
+    const [waitlistEmail] = await db
+      .select()
+      .from(waitlistEmails)
+      .where(eq(waitlistEmails.email, email));
+    return waitlistEmail || undefined;
+  }
+
+  async getWaitlistCount(): Promise<number> {
+    const [result] = await db
+      .select({ count: count() })
+      .from(waitlistEmails);
+    return result.count;
+  }
+}
+
+export const storage = new DatabaseStorage();
