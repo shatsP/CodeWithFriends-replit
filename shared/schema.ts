@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,6 +13,9 @@ export const waitlistEmails = pgTable("waitlist_emails", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  confirmed: boolean("confirmed").default(false).notNull(),
+  confirmationToken: varchar("confirmation_token").unique(),
+  confirmedAt: timestamp("confirmed_at"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({

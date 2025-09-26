@@ -43,6 +43,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Confirm email subscription
+  app.post("/api/waitlist/confirm/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({ 
+          message: "Confirmation token is required" 
+        });
+      }
+
+      const confirmed = await storage.confirmEmail(token);
+      
+      if (!confirmed) {
+        return res.status(404).json({ 
+          message: "Invalid or expired confirmation token" 
+        });
+      }
+
+      res.json({ 
+        message: "Email confirmed successfully",
+        confirmed: true 
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Resend confirmation email
+  app.post("/api/waitlist/resend-confirmation", async (req, res) => {
+    try {
+      // Validate request body with Zod
+      const validatedData = z.object({ 
+        email: z.string().email("Please enter a valid email address") 
+      }).parse(req.body);
+
+      const waitlistEntry = await storage.getWaitlistEmail(validatedData.email);
+      
+      if (!waitlistEntry) {
+        return res.status(404).json({ 
+          message: "Email not found in waitlist" 
+        });
+      }
+
+      if (waitlistEntry.confirmed) {
+        return res.status(400).json({ 
+          message: "Email is already confirmed" 
+        });
+      }
+
+      // Generate new confirmation token
+      const newToken = await storage.regenerateConfirmationToken(validatedData.email);
+      
+      // In a real app, you would send the confirmation email here
+      // For development/testing only, return the token
+      const response: any = { message: "Confirmation email resent" };
+      if (process.env.NODE_ENV === 'development') {
+        response.token = newToken;
+      }
+      
+      res.json(response);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: error.errors[0]?.message || "Invalid email format" 
+        });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
